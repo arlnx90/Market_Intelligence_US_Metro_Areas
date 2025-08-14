@@ -1,0 +1,71 @@
+CREATE TABLE market_characteristics
+(Area varchar, TotalPopulation integer, Pop_Under5 integer, Pop_5_to_9 integer, Pop_10_to_14 integer, Pop_15_to_19 integer,
+Pop_20_to_24 integer, Pop_25_to_29 integer, Pop_30_to_34 integer, Pop_35_to_39 integer, Pop_40_to_44 integer,
+Pop_45_to_49 integer, Pop_50_to_54 integer, Pop_55_to_59 integer, Pop_60_to_64 integer, Pop_65_to_69 integer,
+Pop_70_to_74 integer, Pop_75_to_79 integer, Pop_80_to_85 integer, Pop_85andOver integer, MedianAge decimal (3,1),
+SexRatio_Male_per_100_Female decimal (4,1), Employment_Civilian_Total integer, Employment_Mgmnt_Bus_Sci_Arts integer,
+Employment_Services integer, Employment_Sales_Office integer, Employment_NatResource_Constr_Maint integer,
+Employment_Prod_Trans_MaterialMoving integer, HH_Inc_Median integer, HH_Inc_Mean integer)
+
+--Company XYZ is planning to expand its business in several areas. 
+
+--Query 1: Product Line A is mainly purchased by office workers in middle-sized markets with populations between 100K - 500K
+--The company has the budget to advertise in 3 markets for Product Line A.
+SELECT Area, TotalPopulation, Employment_Sales_Office
+FROM market_characteristics
+WHERE TotalPopulation BETWEEN 100000 AND 500000
+ORDER BY Employment_Sales_Office DESC
+LIMIT 3
+
+--Query 2: The company is considering producing a new line of toys. The product line targets children aged 5-9,
+--but it could also be retooled to target children aged 10-14. 
+--Based on other sales data, the product line should sell mainly in major metro's with over 1 million population.
+--Expected market penetration for the product line is 0.2% for 5-9 y/o and and 0.3% for 10-14 y/o.
+--Which product line should be produced for the greatest potential sales?
+WITH potential_mkt_CTE AS (
+	SELECT Area, TotalPopulation, Pop_5_to_9 * 0.002 AS metro_potential_mkt_5_to_9, Pop_10_to_14 * 0.003 AS metro_potential_mkt_10_to_14
+	FROM market_characteristics
+	WHERE TotalPopulation > 1000000
+)
+SELECT ROUND(SUM(metro_potential_mkt_5_to_9)) AS Total_Potential_Mkt_5_to_9, ROUND(SUM(metro_potential_mkt_10_to_14)) AS Total_Potential_Mkt_10_to_14
+FROM potential_mkt_CTE
+
+--Query 3: The company is considering a new retail location.
+--Previous locations have done the best in markets with positive income skewness, all else being equal, and median household income between $60K and $100K
+--What markets are potential locations for the new location based on these criteria?
+WITH potential_locations_CTE AS (
+	SELECT Area, HH_Inc_Median, HH_Inc_Mean, 
+	CASE 
+		WHEN HH_Inc_Mean > HH_Inc_Median THEN 'Positive'
+		WHEN HH_Inc_Mean < HH_Inc_Median THEN 'Negative'
+		ELSE 'Equal'
+		END AS Household_Income_Skewness
+	FROM market_characteristics
+	WHERE HH_Inc_Median BETWEEN 60000 AND 100000
+)
+SELECT Area, HH_Inc_Median, Household_Income_Skewness
+FROM potential_locations_CTE
+WHERE Household_Income_Skewness = 'Positive';
+
+--Query 4: Following the previous query, the company has identified 3 markets of interest - 
+--Chicago-Naperville-Elgin, IL-IN, Detroit-Warren-Dearborn, MI, and Cleveland, OH.
+--For a team presentation, produce a table for these markets that includes population,
+--median age, median household income, mean household income, and income skewness.
+WITH potential_locations_CTE AS (
+	SELECT Area, HH_Inc_Median, HH_Inc_Mean, 
+	CASE 
+		WHEN HH_Inc_Mean > HH_Inc_Median THEN 'Positive'
+		WHEN HH_Inc_Mean < HH_Inc_Median THEN 'Negative'
+		ELSE 'Equal'
+		END AS Household_Income_Skewness
+	FROM market_characteristics
+	WHERE Area = 'Chicago-Naperville-Elgin, IL-IN Metro Area' OR Area = 'Detroit-Warren-Dearborn, MI Metro Area' OR Area = 'Cleveland, OH Metro Area'
+ ),
+population_CTE AS (
+	SELECT Area, TotalPopulation
+	FROM market_characteristics
+	WHERE Area = 'Chicago-Naperville-Elgin, IL-IN Metro Area' OR Area = 'Detroit-Warren-Dearborn, MI Metro Area' OR Area = 'Cleveland, OH Metro Area'
+)
+SELECT *
+FROM population_CTE
+JOIN potential_locations_CTE USING(area)
